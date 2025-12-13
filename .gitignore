@@ -1,0 +1,4 @@
+.env
+storage/campaign_*/
+storage/campaigns.json
+storage/*.csv

@@ -1,0 +1,15 @@
+[Unit]
+Description=SwiftSMS Bulk Sender Worker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/bulk-sms
+ExecStart=/usr/bin/php /var/www/bulk-sms/sms_tool/worker/worker.php
+Restart=on-failure
+User=www-data
+Group=www-data
+EnvironmentFile=/var/www/bulk-sms/sms_tool/.env
+
+[Install]
+WantedBy=multi-user.target

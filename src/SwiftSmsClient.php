@@ -3,37 +3,53 @@
 class SwiftSmsClient
 {
     private string $baseUrl;
-    private string $apiKey;
+    private string $accountKey;
     private ?string $defaultSender;
 
     public function __construct()
     {
         $this->baseUrl = rtrim(env('SWIFTSMS_BASE_URL', ''), '/');
-        $this->apiKey = (string) env('SWIFTSMS_API_KEY', '');
+        $this->accountKey = (string) env('SWIFTSMS_ACCOUNT_KEY', '');
         $this->defaultSender = env('SWIFTSMS_SENDER_ID', null);
     }
 
     public function sendSms(string $to, string $message, ?string $senderId = null): array
     {
+        $reference = uniqid('msg_', true);
+
+        $response = $this->sendBulk([$to], $message, $reference, $senderId);
+
+        return [
+            'success' => $response['http_code'] === 200,
+            'status_code' => $response['http_code'],
+            'response' => [
+                'message_id' => null,
+                'status' => $response['http_code'] === 200 ? 'sent' : 'error',
+                'error' => $response['http_code'] === 200 ? null : $response['response'],
+            ],
+            'raw' => $response,
+        ];
+    }
+
+    public function sendBulk(array $cellNumbers, string $message, string $reference, ?string $senderId = null): array
+    {
         $sender = $senderId ?: $this->defaultSender;
 
         $payload = [
-            'to' => $to,
-            'message' => $message,
+            'MessageBody' => $message,
+            'Reference' => $reference,
+            'CellNumbers' => array_values($cellNumbers),
         ];
 
         if (!empty($sender)) {
-            $payload['senderId'] = $sender;
+            $payload['SenderID'] = $sender;
         }
 
-        $ch = curl_init($this->baseUrl . '/messages');
+        $ch = curl_init($this->buildBulkUrl());
         curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $this->apiKey,
-            ],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json;charset=UTF-8'],
+            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_TIMEOUT => 30,
         ]);
@@ -43,26 +59,21 @@ class SwiftSmsClient
         $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($responseBody === false) {
+        if ($error) {
             return [
-                'success' => false,
-                'status_code' => $statusCode,
-                'error' => $error ?: 'Unknown cURL error',
-                'response' => null,
+                'http_code' => $statusCode,
+                'response' => "SwiftSMS CURL error: {$error}",
             ];
         }
 
-        $decoded = json_decode($responseBody, true) ?: [];
-
         return [
-            'success' => $statusCode >= 200 && $statusCode < 300,
-            'status_code' => $statusCode,
-            'response' => [
-                'message_id' => $decoded['messageId'] ?? null,
-                'status' => $decoded['status'] ?? null,
-                'error' => $decoded['error'] ?? null,
-            ],
-            'raw' => $decoded,
+            'http_code' => $statusCode,
+            'response' => is_string($responseBody) ? trim($responseBody) : '',
         ];
+    }
+
+    private function buildBulkUrl(): string
+    {
+        return "{$this->baseUrl}/{$this->accountKey}/Bulk";
     }
 }

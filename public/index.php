@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $seen = [];
             $invalid = 0;
             while (($row = fgetcsv($handle)) !== false) {
-                $phone = trim($row[0] ?? '');
+                $phone = normalize_phone(trim($row[0] ?? ''));
                 $nameField = trim($row[1] ?? '');
                 if ($phone === '') {
                     continue;

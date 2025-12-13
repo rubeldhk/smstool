@@ -78,6 +78,21 @@ function validate_phone(string $phone): bool
     return (bool) preg_match('/^\+?[1-9]\d{7,14}$/', $phone);
 }
 
+function normalize_phone(string $phone): string
+{
+    $digits = preg_replace('/[^\d+]/', '', $phone);
+
+    if ($digits === null) {
+        return $phone;
+    }
+
+    if ($digits !== '' && $digits[0] !== '+') {
+        $digits = '+' . $digits;
+    }
+
+    return $digits;
+}
+
 function rate_limit_sleep(int $perSecond): void
 {
     if ($perSecond <= 0) {

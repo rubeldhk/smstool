@@ -37,7 +37,7 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
 2. Place this repository on the server (e.g., `/var/www/bulk-sms`).
 3. Copy `sms_tool/.env.example` to `sms_tool/.env` and set:
    - `APP_USERNAME` / `APP_PASSWORD` (login)
-   - `SWIFTSMS_BASE_URL` and `SWIFTSMS_API_KEY`
+   - `SWIFTSMS_BASE_URL` and `SWIFTSMS_ACCOUNT_KEY`
    - Optional `SWIFTSMS_SENDER_ID`, `SMS_RATE_LIMIT_PER_SEC`, `SMS_MAX_ATTEMPTS`
 4. Point your web server root to `sms_tool/public` using one of the sample configs in `sms_tool/config/` (update paths and server names).
 5. Create a systemd service for the worker:
@@ -53,7 +53,7 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
    ```
 
 ## SwiftSMS API
-Requests are POSTed to `${SWIFTSMS_BASE_URL}/messages` with JSON body `{"to":"+1...","message":"...","senderId":"..."}` and Bearer auth using `SWIFTSMS_API_KEY`. Responses are stored per recipient for reporting but API keys are never logged.
+Requests are POSTed to `${SWIFTSMS_BASE_URL}/{SWIFTSMS_ACCOUNT_KEY}/Bulk` with JSON body `{"MessageBody":"...","Reference":"...","CellNumbers":["+1..."],"SenderID":"..."}`. Responses are stored per recipient for reporting but account keys are never logged.
 
 ## CSV format
 ```

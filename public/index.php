@@ -275,6 +275,7 @@ $csrf = csrf_token();
         .alert.error {background: #fdecea; color: #611a15;}
         .actions form {display: inline-block; margin-right: 6px;}
         .logout {color: #fff; text-decoration: none;}
+        .campaigns-table {max-height: 380px; overflow-y: auto; margin-top: 8px;}
     </style>
 </head>
 <body>
@@ -332,60 +333,62 @@ $csrf = csrf_token();
             <?php if (empty($campaigns)): ?>
                 <p>No campaigns yet.</p>
             <?php else: ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Country</th>
-                            <th>Status</th>
-                            <th>Counts</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($campaigns as $campaign): 
-                        $counts = $campaign['counts'] ?? update_counts($storage, (int) $campaign['id'], $campaign['counts']['invalid'] ?? 0);
-                        ?>
-                        <tr>
-                            <td><?php echo (int) $campaign['id']; ?></td>
-                            <td><?php echo escape($campaign['name']); ?></td>
-                            <td><?php echo escape(strtoupper($campaign['country'] ?? 'CA')); ?></td>
-                            <td><span class="status <?php echo escape($campaign['status']); ?>"><?php echo escape($campaign['status']); ?></span></td>
-                            <td>
-                                Total: <?php echo $counts['total']; ?><br>
-                                Sent: <?php echo $counts['sent']; ?> | Failed: <?php echo $counts['failed']; ?> | Pending: <?php echo $counts['pending']; ?><br>
-                                Invalid: <?php echo $counts['invalid']; ?>
-                            </td>
-                            <td class="actions">
-                                <form method="post" style="margin-bottom:4px;">
-                                    <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
-                                    <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
-                                    <input type="hidden" name="action" value="start">
-                                    <button type="submit">Start</button>
-                                </form>
-                                <form method="post" style="margin-bottom:4px;">
-                                    <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
-                                    <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
-                                    <input type="hidden" name="action" value="resume">
-                                    <button type="submit">Resume</button>
-                                </form>
-                                <form method="post" style="margin-bottom:4px;">
-                                    <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
-                                    <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
-                                    <input type="hidden" name="action" value="stop">
-                                    <button type="submit">Stop</button>
-                                </form>
-                                <form method="get" action="report.php">
-                                    <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
-                                    <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
-                                    <button type="submit">Download CSV</button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <div class="campaigns-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Country</th>
+                                <th>Status</th>
+                                <th>Counts</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($campaigns as $campaign):
+                            $counts = $campaign['counts'] ?? update_counts($storage, (int) $campaign['id'], $campaign['counts']['invalid'] ?? 0);
+                            ?>
+                            <tr>
+                                <td><?php echo (int) $campaign['id']; ?></td>
+                                <td><?php echo escape($campaign['name']); ?></td>
+                                <td><?php echo escape(strtoupper($campaign['country'] ?? 'CA')); ?></td>
+                                <td><span class="status <?php echo escape($campaign['status']); ?>"><?php echo escape($campaign['status']); ?></span></td>
+                                <td>
+                                    Total: <?php echo $counts['total']; ?><br>
+                                    Sent: <?php echo $counts['sent']; ?> | Failed: <?php echo $counts['failed']; ?> | Pending: <?php echo $counts['pending']; ?><br>
+                                    Invalid: <?php echo $counts['invalid']; ?>
+                                </td>
+                                <td class="actions">
+                                    <form method="post" style="margin-bottom:4px;">
+                                        <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
+                                        <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
+                                        <input type="hidden" name="action" value="start">
+                                        <button type="submit">Start</button>
+                                    </form>
+                                    <form method="post" style="margin-bottom:4px;">
+                                        <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
+                                        <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
+                                        <input type="hidden" name="action" value="resume">
+                                        <button type="submit">Resume</button>
+                                    </form>
+                                    <form method="post" style="margin-bottom:4px;">
+                                        <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
+                                        <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
+                                        <input type="hidden" name="action" value="stop">
+                                        <button type="submit">Stop</button>
+                                    </form>
+                                    <form method="get" action="report.php">
+                                        <input type="hidden" name="campaign_id" value="<?php echo (int) $campaign['id']; ?>">
+                                        <input type="hidden" name="csrf" value="<?php echo escape($csrf); ?>">
+                                        <button type="submit">Download CSV</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
     </div>

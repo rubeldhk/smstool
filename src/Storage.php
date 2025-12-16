@@ -11,7 +11,23 @@ class Storage
 
     public function campaigns(): array
     {
-        return json_read($this->campaignsFile, []);
+        $campaigns = json_read($this->campaignsFile, []);
+
+        usort($campaigns, static function (array $a, array $b): int {
+            $createdA = $a['created_at'] ?? '';
+            $createdB = $b['created_at'] ?? '';
+
+            if ($createdA !== '' && $createdB !== '') {
+                $comparison = strcmp($createdB, $createdA);
+                if ($comparison !== 0) {
+                    return $comparison;
+                }
+            }
+
+            return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
+        });
+
+        return $campaigns;
     }
 
     public function saveCampaigns(array $campaigns): void

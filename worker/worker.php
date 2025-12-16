@@ -11,6 +11,7 @@ $storage = new Storage();
 $client = new SwiftSmsClient();
 $rateLimit = (int) (env('SMS_RATE_LIMIT_PER_SEC', '10'));
 $maxAttempts = (int) (env('SMS_MAX_ATTEMPTS', '2'));
+$defaultCountry = 'CA';
 
 function calculate_counts_cli(array $recipients, int $invalid): array
 {
@@ -43,6 +44,25 @@ foreach ($campaigns as $campaign) {
     }
 
     $campaignId = (int) $campaign['id'];
+    $country = strtoupper($campaign['country'] ?? $defaultCountry);
+    $accountKey = match ($country) {
+        'AU' => env('SWIFTSMS_ACCOUNT_KEY_AU', ''),
+        'NZ' => env('SWIFTSMS_ACCOUNT_KEY_NZ', ''),
+        default => env('SWIFTSMS_ACCOUNT_KEY_CA', env('SWIFTSMS_ACCOUNT_KEY', '')),
+    };
+    if ($accountKey === '') {
+        echo "Campaign {$campaignId} missing account key for country {$country}, skipping.\n";
+        $storage->updateCampaignStatus($campaignId, 'failed');
+        continue;
+    }
+
+    $template = $campaign['message_template'] ?? $campaign['message'] ?? '';
+    if ($template === '') {
+        echo "Campaign {$campaignId} has no message template, skipping.\n";
+        $storage->updateCampaignStatus($campaignId, 'failed');
+        continue;
+    }
+
     echo "Processing campaign {$campaignId}\n";
     $storage->updateCampaignStatus($campaignId, 'running');
     $recipients = $storage->recipients($campaignId);
@@ -61,23 +81,60 @@ foreach ($campaigns as $campaign) {
             continue;
         }
 
+        if (empty($recipient['country'])) {
+            $recipient['country'] = $country;
+        }
+
         if ($recipient['status'] === 'failed' && $recipient['attempts'] >= $maxAttempts) {
             continue;
         }
 
-        $response = $client->sendSms($recipient['phone'], $campaign['message'], $campaign['sender_id'] ?? null);
-        $recipient['attempts'] = ($recipient['attempts'] ?? 0) + 1;
+        $rendered = render_message_template($template, [
+            'customer_name' => $recipient['customer_name'] ?? '',
+            'receiver_name' => $recipient['receiver_name'] ?? '',
+            'phone' => $recipient['phone'] ?? '',
+        ]);
 
-        if ($response['success']) {
+        $recipient['rendered_message'] = $rendered;
+
+        if (strlen($rendered) > 480) {
+            $recipient['status'] = 'failed';
+            $recipient['provider_status'] = 'error';
+            $recipient['error_message'] = 'Message exceeds 480 character limit after rendering.';
+            $recipient['last_error'] = $recipient['error_message'];
+            $recipient['http_code'] = null;
+            $recipients[$index] = $recipient;
+            $storage->saveRecipients($campaignId, $recipients);
+            continue;
+        }
+
+        $reference = uniqid('msg_', true);
+        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $reference, $campaign['sender_id'] ?? null);
+        $recipient['attempts'] = ($recipient['attempts'] ?? 0) + 1;
+        $recipient['http_code'] = $response['http_code'] ?? null;
+        $recipient['provider_response'] = $response['response'] ?? null;
+
+        $success = ($response['http_code'] ?? 0) === 200;
+        $responseBody = $response['response'] ?? null;
+
+        if ($success) {
             $recipient['status'] = 'sent';
-            $recipient['provider_message_id'] = $response['response']['message_id'] ?? null;
-            $recipient['provider_status'] = $response['response']['status'] ?? 'sent';
+            $recipient['provider_message_id'] = is_array($responseBody) ? ($responseBody['message_id'] ?? null) : null;
+            $recipient['provider_status'] = is_array($responseBody)
+                ? ($responseBody['status'] ?? 'sent')
+                : 'sent';
             $recipient['error_message'] = null;
+            $recipient['last_error'] = null;
             $recipient['sent_at'] = date('c');
         } else {
             $recipient['status'] = $recipient['attempts'] >= $maxAttempts ? 'failed' : 'pending';
-            $recipient['provider_status'] = $response['response']['status'] ?? 'error';
-            $recipient['error_message'] = $response['response']['error'] ?? $response['error'] ?? 'Send failed';
+            $recipient['provider_status'] = is_array($responseBody)
+                ? ($responseBody['status'] ?? 'error')
+                : 'error';
+            $recipient['error_message'] = is_array($responseBody)
+                ? ($responseBody['error'] ?? $response['error'] ?? 'Send failed')
+                : ($responseBody ?? $response['error'] ?? 'Send failed');
+            $recipient['last_error'] = $recipient['error_message'];
         }
 
         $recipients[$index] = $recipient;

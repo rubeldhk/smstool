@@ -35,16 +35,35 @@ header('Content-Type: text/csv');
 header('Content-Disposition: attachment; filename="campaign_' . $campaignId . '_report.csv"');
 
 $output = fopen('php://output', 'w');
-fputcsv($output, ['phone', 'name', 'status', 'provider_message_id', 'provider_status', 'error_message', 'attempts', 'sent_at']);
+fputcsv($output, [
+    'phone',
+    'customer_name',
+    'receiver_name',
+    'country',
+    'rendered_message',
+    'status',
+    'provider_message_id',
+    'provider_status',
+    'provider_response',
+    'http_code',
+    'attempts',
+    'last_error',
+    'sent_at',
+]);
 foreach ($recipients as $recipient) {
     fputcsv($output, [
         $recipient['phone'],
-        $recipient['name'],
+        $recipient['customer_name'] ?? '',
+        $recipient['receiver_name'] ?? ($recipient['name'] ?? ''),
+        $recipient['country'] ?? ($campaign['country'] ?? 'CA'),
+        $recipient['rendered_message'] ?? '',
         $recipient['status'],
         $recipient['provider_message_id'],
         $recipient['provider_status'],
-        $recipient['error_message'],
+        is_array($recipient['provider_response'] ?? null) ? json_encode($recipient['provider_response']) : ($recipient['provider_response'] ?? ''),
+        $recipient['http_code'] ?? '',
         $recipient['attempts'],
+        $recipient['last_error'] ?? $recipient['error_message'],
         $recipient['sent_at'],
     ]);
 }

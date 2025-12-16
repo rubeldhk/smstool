@@ -73,24 +73,63 @@ function next_id(array $items): int
     return $max + 1;
 }
 
-function validate_phone(string $phone): bool
+function normalize_phone_for_country(string $phone, string $country): string
 {
-    return (bool) preg_match('/^\+?[1-9]\d{7,14}$/', $phone);
+    $digits = preg_replace('/\D+/', '', $phone);
+
+    if ($digits === null) {
+        return '';
+    }
+
+    $country = strtoupper($country);
+
+    if ($country === 'AU') {
+        if (str_starts_with($digits, '0')) {
+            $digits = '61' . substr($digits, 1);
+        }
+    } elseif ($country === 'NZ') {
+        if (str_starts_with($digits, '0')) {
+            $digits = '64' . substr($digits, 1);
+        }
+    } else { // Default to CA/US rules
+        if (strlen($digits) === 10) {
+            $digits = '1' . $digits;
+        }
+    }
+
+    return $digits;
+}
+
+function validate_normalized_phone(string $phone, string $country): bool
+{
+    if ($phone === '' || !ctype_digit($phone)) {
+        return false;
+    }
+
+    $len = strlen($phone);
+    $max = 15;
+    $country = strtoupper($country);
+
+    if ($country === 'AU') {
+        return str_starts_with($phone, '61') && $len >= 11 && $len <= $max;
+    }
+
+    if ($country === 'NZ') {
+        return str_starts_with($phone, '64') && $len >= 10 && $len <= $max;
+    }
+
+    // Default CA/US
+    return str_starts_with($phone, '1') && $len >= 11 && $len <= $max;
 }
 
 function normalize_phone(string $phone): string
 {
-    $digits = preg_replace('/[^\d+]/', '', $phone);
+    return normalize_phone_for_country($phone, 'CA');
+}
 
-    if ($digits === null) {
-        return $phone;
-    }
-
-    if ($digits !== '' && $digits[0] !== '+') {
-        $digits = '+' . $digits;
-    }
-
-    return $digits;
+function validate_phone(string $phone): bool
+{
+    return validate_normalized_phone(normalize_phone($phone), 'CA');
 }
 
 function rate_limit_sleep(int $perSecond): void
@@ -99,4 +138,20 @@ function rate_limit_sleep(int $perSecond): void
         return;
     }
     usleep((int) floor(1_000_000 / $perSecond));
+}
+
+function render_message_template(string $template, array $data): string
+{
+    $replacements = [
+        '{{customer_name}}' => $data['customer_name'] ?? '',
+        '{{receiver_name}}' => $data['receiver_name'] ?? '',
+        '{{phone}}' => $data['phone'] ?? '',
+    ];
+
+    $rendered = strtr($template, $replacements);
+    // Collapse extra internal spaces while preserving newlines
+    $rendered = preg_replace('/[ \t]{2,}/', ' ', $rendered ?? '');
+    $rendered = preg_replace('/\s+\n/', "\n", $rendered ?? '');
+
+    return trim((string) ($rendered ?? ''));
 }

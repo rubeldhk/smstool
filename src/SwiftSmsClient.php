@@ -3,21 +3,21 @@
 class SwiftSmsClient
 {
     private string $baseUrl;
-    private string $accountKey;
+    private string $defaultAccountKey;
     private ?string $defaultSender;
 
     public function __construct()
     {
         $this->baseUrl = rtrim(env('SWIFTSMS_BASE_URL', ''), '/');
-        $this->accountKey = (string) env('SWIFTSMS_ACCOUNT_KEY', '');
+        $this->defaultAccountKey = (string) env('SWIFTSMS_ACCOUNT_KEY', '');
         $this->defaultSender = env('SWIFTSMS_SENDER_ID', null);
     }
 
-    public function sendSms(string $to, string $message, ?string $senderId = null): array
+    public function sendSms(string $to, string $message, ?string $accountKey = null, ?string $senderId = null): array
     {
         $reference = uniqid('msg_', true);
 
-        $response = $this->sendBulk([$to], $message, $reference, $senderId);
+        $response = $this->sendBulk($accountKey ?? $this->defaultAccountKey, [$to], $message, $reference, $senderId);
 
         return [
             'success' => $response['http_code'] === 200,
@@ -31,12 +31,12 @@ class SwiftSmsClient
         ];
     }
 
-    public function sendBulk(array $cellNumbers, string $message, string $reference, ?string $senderId = null): array
+    public function sendBulk(string $accountKey, array $cellNumbers, string $messageBody, string $reference, ?string $senderId = null): array
     {
         $sender = $senderId ?: $this->defaultSender;
 
         $payload = [
-            'MessageBody' => $message,
+            'MessageBody' => $messageBody,
             'Reference' => $reference,
             'CellNumbers' => array_values($cellNumbers),
         ];
@@ -45,7 +45,7 @@ class SwiftSmsClient
             $payload['SenderID'] = $sender;
         }
 
-        $ch = curl_init($this->buildBulkUrl());
+        $ch = curl_init($this->buildBulkUrl($accountKey));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json;charset=UTF-8'],
@@ -61,7 +61,7 @@ class SwiftSmsClient
 
         if ($error) {
             return [
-                'http_code' => $statusCode,
+                'http_code' => $statusCode ?: 0,
                 'response' => "SwiftSMS CURL error: {$error}",
             ];
         }
@@ -72,8 +72,8 @@ class SwiftSmsClient
         ];
     }
 
-    private function buildBulkUrl(): string
+    private function buildBulkUrl(string $accountKey): string
     {
-        return "{$this->baseUrl}/{$this->accountKey}/Bulk";
+        return "{$this->baseUrl}/{$accountKey}/Bulk";
     }
 }

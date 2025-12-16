@@ -4,7 +4,7 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
 
 ## Features
 - Static login credentials sourced from environment variables.
-- CSV upload (phone, optional name) with E.164 validation and de-duplication.
+- CSV upload (phone, customer name, receiver name) with per-country normalization and de-duplication.
 - Phone numbers stored in `storage/campaign_<id>/recipients.txt` plus JSON metadata for statuses.
 - Start, stop, and resume actions per campaign; resumable after restarts.
 - Background worker with rate limiting and retry support.
@@ -37,8 +37,8 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
 2. Place this repository on the server (e.g., `/var/www/bulk-sms`).
 3. Copy `sms_tool/.env.example` to `sms_tool/.env` and set:
    - `APP_USERNAME` / `APP_PASSWORD` (login)
-   - `SWIFTSMS_BASE_URL` and `SWIFTSMS_ACCOUNT_KEY`
-   - Optional `SWIFTSMS_SENDER_ID`, `SMS_RATE_LIMIT_PER_SEC`, `SMS_MAX_ATTEMPTS`
+   - `SWIFTSMS_BASE_URL` and country keys `SWIFTSMS_ACCOUNT_KEY_CA`, `SWIFTSMS_ACCOUNT_KEY_AU`, `SWIFTSMS_ACCOUNT_KEY_NZ`
+   - Optional `SWIFTSMS_ACCOUNT_KEY` (legacy default), `SWIFTSMS_SENDER_ID`, `SMS_RATE_LIMIT_PER_SEC`, `SMS_MAX_ATTEMPTS`
 4. Point your web server root to `sms_tool/public` using one of the sample configs in `sms_tool/config/` (update paths and server names).
 5. Create a systemd service for the worker:
    ```bash
@@ -53,14 +53,15 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
    ```
 
 ## SwiftSMS API
-Requests are POSTed to `${SWIFTSMS_BASE_URL}/{SWIFTSMS_ACCOUNT_KEY}/Bulk` with JSON body `{"MessageBody":"...","Reference":"...","CellNumbers":["+1..."],"SenderID":"..."}`. Responses are stored per recipient for reporting but account keys are never logged.
+Requests are POSTed to `${SWIFTSMS_BASE_URL}/{SWIFTSMS_ACCOUNT_KEY_<COUNTRY>}/Bulk` with JSON body `{"MessageBody":"...","Reference":"...","CellNumbers":["1..."],"SenderID":"..."}`. Responses are stored per recipient for reporting but account keys are never logged.
 
 ## CSV format
 ```
-+15551234567,Jane Doe
-+15559876543,John Smith
+phone,customer_name,receiver_name
+4165551234,Jane Doe,Alex Doe
+0412345678,John Smith,Anna Smith
 ```
-Only the first column (phone) is required; additional columns are ignored. Numbers must be E.164 formatted and duplicates are removed automatically.
+Headers are matched case-insensitively (underscores allowed). Phone numbers are normalized by country (CA prefixes 1 to 10-digit numbers; AU/NZ swap leading 0 for 61/64) and duplicates are removed automatically.
 
 ## Background worker
 - Command: `php sms_tool/worker/worker.php`
@@ -97,7 +98,7 @@ Below is a minimal, battle-tested path for deploying to a fresh Ubuntu EC2 insta
 4. **Environment configuration**
    ```bash
    cp sms_tool/.env.example sms_tool/.env
-   nano sms_tool/.env   # set APP_USERNAME/APP_PASSWORD, SWIFTSMS_BASE_URL, SWIFTSMS_API_KEY, optional SENDER_ID
+   nano sms_tool/.env   # set APP_USERNAME/APP_PASSWORD, SWIFTSMS_BASE_URL, SWIFTSMS_ACCOUNT_KEY_CA/AU/NZ, optional SENDER_ID
    ```
 
 5. **Permissions**
@@ -143,4 +144,3 @@ Below is a minimal, battle-tested path for deploying to a fresh Ubuntu EC2 insta
     git pull
     sudo systemctl restart nginx php8.1-fpm swiftsms-worker.service
     ```
-

@@ -11,7 +11,23 @@ class Storage
 
     public function campaigns(): array
     {
-        return json_read($this->campaignsFile, []);
+        $campaigns = json_read($this->campaignsFile, []);
+
+        usort($campaigns, static function (array $a, array $b): int {
+            $createdA = $a['created_at'] ?? '';
+            $createdB = $b['created_at'] ?? '';
+
+            if ($createdA !== '' && $createdB !== '') {
+                $comparison = strcmp($createdB, $createdA);
+                if ($comparison !== 0) {
+                    return $comparison;
+                }
+            }
+
+            return ($b['id'] ?? 0) <=> ($a['id'] ?? 0);
+        });
+
+        return $campaigns;
     }
 
     public function saveCampaigns(array $campaigns): void
@@ -19,7 +35,7 @@ class Storage
         json_write($this->campaignsFile, $campaigns);
     }
 
-    public function createCampaign(string $name, string $message, ?string $senderId, array $recipients, int $invalidCount): array
+    public function createCampaign(string $name, string $messageTemplate, ?string $senderId, string $country, array $recipients, int $invalidCount, array $previewMessages = []): array
     {
         $campaigns = $this->campaigns();
         $campaignId = next_id($campaigns);
@@ -33,17 +49,31 @@ class Storage
         $recipientRows = [];
         $recipientLines = [];
         foreach ($recipients as $recipient) {
+            $customerName = $recipient['customer_name'] ?? '';
+            $receiverName = $recipient['receiver_name'] ?? '';
             $recipientRows[] = [
                 'phone' => $recipient['phone'],
-                'name' => $recipient['name'],
+                'customer_name' => $customerName,
+                'receiver_name' => $receiverName,
+                'country' => $country,
+                'rendered_message' => $recipient['rendered_message'] ?? null,
+                'name' => $receiverName !== '' ? $receiverName : $customerName, // backward compatible field
                 'status' => 'pending',
                 'provider_message_id' => null,
                 'provider_status' => null,
                 'error_message' => null,
+                'last_error' => null,
+                'provider_response' => null,
+                'http_code' => null,
                 'attempts' => 0,
                 'sent_at' => null,
             ];
-            $recipientLines[] = $recipient['phone'] . (!empty($recipient['name']) ? ',' . $recipient['name'] : '');
+            $recipientLines[] = implode(',', [
+                $recipient['phone'],
+                $customerName,
+                $receiverName,
+                $country,
+            ]);
         }
 
         file_put_contents($campaignDir . '/recipients.txt', implode("\n", $recipientLines));
@@ -52,11 +82,14 @@ class Storage
         $campaign = [
             'id' => $campaignId,
             'name' => $name,
-            'message' => $message,
+            'message' => $messageTemplate,
+            'message_template' => $messageTemplate,
+            'country' => $country,
             'sender_id' => $senderId,
             'status' => 'draft',
             'created_at' => $timestamp,
             'updated_at' => $timestamp,
+            'preview_messages' => array_values(array_slice($previewMessages, 0, 5)),
             'counts' => [
                 'total' => count($recipients),
                 'valid' => count($recipients),

@@ -27,7 +27,14 @@ foreach ($requiredExtensions as $ext) {
 
 add_check($checks, '.env present', file_exists(BASE_PATH . '/.env'), 'Copy .env.example to .env');
 
-$requiredEnv = ['APP_USERNAME', 'APP_PASSWORD', 'SWIFTSMS_BASE_URL', 'SWIFTSMS_API_KEY'];
+$requiredEnv = [
+    'APP_USERNAME',
+    'APP_PASSWORD',
+    'SWIFTSMS_BASE_URL',
+    'SWIFTSMS_ACCOUNT_KEY_CA',
+    'SWIFTSMS_ACCOUNT_KEY_AU',
+    'SWIFTSMS_ACCOUNT_KEY_NZ',
+];
 foreach ($requiredEnv as $envKey) {
     $value = env($envKey);
     add_check(

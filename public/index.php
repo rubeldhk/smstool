@@ -138,16 +138,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $normalizeHeader = static function ($value): string {
                 $value = strtolower(trim((string) $value));
-                $value = str_replace([' ', '-'], '_', $value);
-                return $value;
+                $value = preg_replace('/[^a-z0-9]+/', '_', $value ?? '') ?? '';
+                return trim($value, '_');
             };
 
             if ($header === false) {
                 $error = 'CSV file is empty.';
             } else {
                 $columnMap = [];
+                $aliases = [
+                    'customer' => 'customer_name',
+                    'customername' => 'customer_name',
+                    'receivername' => 'receiver_name',
+                ];
+
                 foreach ($header as $index => $column) {
                     $normalized = $normalizeHeader($column);
+                    $normalized = $aliases[$normalized] ?? $normalized;
                     $columnMap[$normalized] = $index;
                 }
 
@@ -198,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             fclose($handle);
 
-            if (empty($recipients)) {
+            if (!$error && empty($recipients)) {
                 $error = 'No valid phone numbers found.';
             } else {
                 $campaign = $storage->createCampaign($name, $messageTemplate, $senderId, $country, $recipients, $invalid, $previewMessages);

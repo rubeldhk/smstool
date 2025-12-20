@@ -111,7 +111,9 @@ function validate_normalized_phone(string $phone, string $country): bool
     $country = strtoupper($country);
 
     if ($country === 'AU') {
-        return str_starts_with($phone, '61') && $len >= 11 && $len <= $max;
+        // Australian numbers must include the country code and be either 11 or 12 digits in total.
+        // This accepts the common mobile format (614XXXXXXXX) and longer landline variants.
+        return str_starts_with($phone, '61') && in_array($len, [11, 12], true);
     }
 
     if ($country === 'NZ') {

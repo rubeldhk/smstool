@@ -124,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (!$error && $_FILES['csv']['size'] > 2 * 1024 * 1024) {
-            $error = 'CSV must be under 2MB.';
+        if (!$error && $_FILES['csv']['size'] > CSV_MAX_BYTES) {
+            $error = 'CSV must be under ' . format_bytes(CSV_MAX_BYTES) . '.';
         }
 
         if (!$error) {

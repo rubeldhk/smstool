@@ -9,7 +9,7 @@ A minimal PHP 8+ web UI and CLI worker for sending bulk SMS through the SwiftSMS
 - Start, stop, and resume actions per campaign; resumable after restarts.
 - Background worker with rate limiting and retry support.
 - Downloadable CSV report of delivery outcomes.
-- CSRF protection, file size/type validation, and XSS-safe output.
+- CSRF protection, file size/type validation (default 50 MB, configurable), and XSS-safe output.
 
 ## Quick start (local)
 1. Ensure PHP 8+ with the cURL extension is installed.
@@ -71,8 +71,14 @@ Headers are matched case-insensitively (underscores allowed). Phone numbers are 
 ## Security notes
 - Static login only; update `.env` before deploying.
 - CSRF tokens are added to all forms.
-- Upload validation limits files to CSV/plain text under 2 MB.
+- CSV uploads are validated against the configurable `CSV_MAX_BYTES` limit (default 50 MB).
 - Storage uses JSON/text files only—no database required.
+
+## Upload size limits
+- The maximum CSV size is controlled by the `CSV_MAX_BYTES` environment variable (accepts bytes or shorthand like `50M`).
+- Ensure your web server and PHP are configured to allow files at least this large:
+  - **Nginx:** set `client_max_body_size` to match (the sample config in `config/nginx.conf` is set to 50M).
+  - **PHP:** set `upload_max_filesize` and `post_max_size` to the same value or larger.
 
 ## AWS EC2 deployment (Ubuntu)
 Below is a minimal, battle-tested path for deploying to a fresh Ubuntu EC2 instance (e.g., t3.small) using Nginx and PHP-FPM.

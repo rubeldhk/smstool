@@ -31,6 +31,52 @@ function escape(string $value): string
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
+function parse_size_to_bytes(?string $value, int $default): int
+{
+    if ($value === null || trim($value) === '') {
+        return $default;
+    }
+
+    $value = trim($value);
+    $lastChar = strtolower(substr($value, -1));
+    $number = $value;
+    $multiplier = 1;
+
+    if (in_array($lastChar, ['k', 'm', 'g'], true)) {
+        $number = substr($value, 0, -1);
+        $powers = [
+            'k' => 1024,
+            'm' => 1024 * 1024,
+            'g' => 1024 * 1024 * 1024,
+        ];
+        $multiplier = $powers[$lastChar] ?? 1;
+    }
+
+    if (!is_numeric($number)) {
+        return $default;
+    }
+
+    $bytes = (int) $number * $multiplier;
+    return $bytes > 0 ? $bytes : $default;
+}
+
+function format_bytes(int $bytes): string
+{
+    if ($bytes >= 1024 * 1024 * 1024) {
+        return round($bytes / (1024 * 1024 * 1024), 2) . ' GB';
+    }
+
+    if ($bytes >= 1024 * 1024) {
+        return round($bytes / (1024 * 1024), 2) . ' MB';
+    }
+
+    if ($bytes >= 1024) {
+        return round($bytes / 1024, 2) . ' KB';
+    }
+
+    return $bytes . ' bytes';
+}
+
 function csrf_token(): string
 {
     if (empty($_SESSION['csrf_token'])) {

@@ -67,12 +67,19 @@ foreach ($campaigns as $campaign) {
     $storage->updateCampaignStatus($campaignId, 'running');
     $recipients = $storage->recipients($campaignId);
 
+    $campaignStopped = false;
     foreach ($recipients as $index => $recipient) {
         // Reload status to honor stop commands
         $freshCampaigns = $storage->campaigns();
         foreach ($freshCampaigns as $fresh) {
             if ((int) $fresh['id'] === $campaignId && $fresh['status'] === 'stopped') {
+                $stopReference = 'campaign-' . $campaignId;
+                $stopResponse = $client->stopBulk($accountKey, $stopReference);
+                $stopCode = $stopResponse['http_code'] ?? 0;
+                $stopBody = $stopResponse['response'] ?? '';
+                echo "Stop requested for campaign {$campaignId} (HTTP {$stopCode}): {$stopBody}\n";
                 echo "Campaign {$campaignId} stopped.\n";
+                $campaignStopped = true;
                 break 2;
             }
         }
@@ -143,6 +150,13 @@ foreach ($campaigns as $campaign) {
     }
 
     $counts = calculate_counts_cli($recipients, $campaign['counts']['invalid'] ?? 0);
+
+    if ($campaignStopped) {
+        $storage->setCampaign($campaignId, ['status' => 'stopped', 'counts' => $counts]);
+        echo "Campaign {$campaignId} status: stopped\n";
+        continue;
+    }
+
     $newStatus = $counts['pending'] === 0 ? 'completed' : 'running';
     $storage->setCampaign($campaignId, ['status' => $newStatus, 'counts' => $counts]);
     echo "Campaign {$campaignId} status: {$newStatus}\n";

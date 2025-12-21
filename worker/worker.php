@@ -57,6 +57,7 @@ foreach ($campaigns as $campaign) {
     }
 
     $template = $campaign['message_template'] ?? $campaign['message'] ?? '';
+    $campaignReference = $campaign['reference'] ?? ('campaign-' . $campaignId);
     if ($template === '') {
         echo "Campaign {$campaignId} has no message template, skipping.\n";
         $storage->updateCampaignStatus($campaignId, 'failed');
@@ -67,12 +68,18 @@ foreach ($campaigns as $campaign) {
     $storage->updateCampaignStatus($campaignId, 'running');
     $recipients = $storage->recipients($campaignId);
 
+    $campaignStopped = false;
     foreach ($recipients as $index => $recipient) {
         // Reload status to honor stop commands
         $freshCampaigns = $storage->campaigns();
         foreach ($freshCampaigns as $fresh) {
             if ((int) $fresh['id'] === $campaignId && $fresh['status'] === 'stopped') {
+                $stopResponse = $client->stopBulk($accountKey, $campaignReference);
+                $stopCode = $stopResponse['http_code'] ?? 0;
+                $stopBody = $stopResponse['response'] ?? '';
+                echo "Stop requested for campaign {$campaignId} (HTTP {$stopCode}): {$stopBody}\n";
                 echo "Campaign {$campaignId} stopped.\n";
+                $campaignStopped = true;
                 break 2;
             }
         }
@@ -108,8 +115,7 @@ foreach ($campaigns as $campaign) {
             continue;
         }
 
-        $reference = uniqid('msg_', true);
-        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $reference, $campaign['sender_id'] ?? null);
+        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $campaignReference, $campaign['sender_id'] ?? null);
         $recipient['attempts'] = ($recipient['attempts'] ?? 0) + 1;
         $recipient['http_code'] = $response['http_code'] ?? null;
         $recipient['provider_response'] = $response['response'] ?? null;
@@ -143,6 +149,13 @@ foreach ($campaigns as $campaign) {
     }
 
     $counts = calculate_counts_cli($recipients, $campaign['counts']['invalid'] ?? 0);
+
+    if ($campaignStopped) {
+        $storage->setCampaign($campaignId, ['status' => 'stopped', 'counts' => $counts]);
+        echo "Campaign {$campaignId} status: stopped\n";
+        continue;
+    }
+
     $newStatus = $counts['pending'] === 0 ? 'completed' : 'running';
     $storage->setCampaign($campaignId, ['status' => $newStatus, 'counts' => $counts]);
     echo "Campaign {$campaignId} status: {$newStatus}\n";

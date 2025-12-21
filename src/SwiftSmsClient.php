@@ -72,8 +72,44 @@ class SwiftSmsClient
         ];
     }
 
+    public function stopBulk(string $accountKey, string $reference): array
+    {
+        $payload = ['Reference' => $reference];
+
+        $ch = curl_init($this->buildStopUrl($accountKey));
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json;charset=UTF-8'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_TIMEOUT => 15,
+        ]);
+
+        $responseBody = curl_exec($ch);
+        $error = curl_error($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($error) {
+            return [
+                'http_code' => $statusCode ?: 0,
+                'response' => "SwiftSMS stop CURL error: {$error}",
+            ];
+        }
+
+        return [
+            'http_code' => $statusCode,
+            'response' => is_string($responseBody) ? trim($responseBody) : '',
+        ];
+    }
+
     private function buildBulkUrl(string $accountKey): string
     {
         return "{$this->baseUrl}/{$accountKey}/Bulk";
+    }
+
+    private function buildStopUrl(string $accountKey): string
+    {
+        return "{$this->baseUrl}/{$accountKey}/Stop";
     }
 }

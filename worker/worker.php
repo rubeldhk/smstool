@@ -57,6 +57,7 @@ foreach ($campaigns as $campaign) {
     }
 
     $template = $campaign['message_template'] ?? $campaign['message'] ?? '';
+    $campaignReference = $campaign['reference'] ?? ('campaign-' . $campaignId);
     if ($template === '') {
         echo "Campaign {$campaignId} has no message template, skipping.\n";
         $storage->updateCampaignStatus($campaignId, 'failed');
@@ -73,8 +74,7 @@ foreach ($campaigns as $campaign) {
         $freshCampaigns = $storage->campaigns();
         foreach ($freshCampaigns as $fresh) {
             if ((int) $fresh['id'] === $campaignId && $fresh['status'] === 'stopped') {
-                $stopReference = 'campaign-' . $campaignId;
-                $stopResponse = $client->stopBulk($accountKey, $stopReference);
+                $stopResponse = $client->stopBulk($accountKey, $campaignReference);
                 $stopCode = $stopResponse['http_code'] ?? 0;
                 $stopBody = $stopResponse['response'] ?? '';
                 echo "Stop requested for campaign {$campaignId} (HTTP {$stopCode}): {$stopBody}\n";
@@ -115,8 +115,7 @@ foreach ($campaigns as $campaign) {
             continue;
         }
 
-        $reference = uniqid('msg_', true);
-        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $reference, $campaign['sender_id'] ?? null);
+        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $campaignReference, $campaign['sender_id'] ?? null);
         $recipient['attempts'] = ($recipient['attempts'] ?? 0) + 1;
         $recipient['http_code'] = $response['http_code'] ?? null;
         $recipient['provider_response'] = $response['response'] ?? null;

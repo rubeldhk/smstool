@@ -54,11 +54,7 @@ foreach ($campaigns as $campaign) {
 
     $campaignId = (int) $campaign['id'];
     $country = strtoupper($campaign['country'] ?? $defaultCountry);
-    $accountKey = match ($country) {
-        'AU' => env('SWIFTSMS_ACCOUNT_KEY_AU', ''),
-        'NZ' => env('SWIFTSMS_ACCOUNT_KEY_NZ', ''),
-        default => env('SWIFTSMS_ACCOUNT_KEY_CA', env('SWIFTSMS_ACCOUNT_KEY', '')),
-    };
+    $accountKey = $client->getAccountKeyForCountry($country);
     if ($accountKey === '') {
         echo "Campaign {$campaignId} missing account key for country {$country}, skipping.\n";
         $storage->updateCampaignStatus($campaignId, 'failed');

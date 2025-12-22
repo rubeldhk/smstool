@@ -3,21 +3,42 @@
 class SwiftSmsClient
 {
     private string $baseUrl;
-    private string $defaultAccountKey;
+    /**
+     * @var array<string, string>
+     */
+    private array $accountKeys;
     private ?string $defaultSender;
 
     public function __construct()
     {
         $this->baseUrl = rtrim(env('SWIFTSMS_BASE_URL', ''), '/');
-        $this->defaultAccountKey = (string) env('SWIFTSMS_ACCOUNT_KEY', '');
+        $this->accountKeys = [
+            'CA' => (string) env('SWIFTSMS_ACCOUNT_KEY_CA', env('SWIFTSMS_ACCOUNT_KEY', '')),
+            'AU' => (string) env('SWIFTSMS_ACCOUNT_KEY_AU', env('SWIFTSMS_ACCOUNT_KEY', '')),
+            'NZ' => (string) env('SWIFTSMS_ACCOUNT_KEY_NZ', env('SWIFTSMS_ACCOUNT_KEY', '')),
+            'DEFAULT' => (string) env('SWIFTSMS_ACCOUNT_KEY', ''),
+        ];
         $this->defaultSender = env('SWIFTSMS_SENDER_ID', null);
     }
 
-    public function sendSms(string $to, string $message, ?string $accountKey = null, ?string $senderId = null): array
+    public function getAccountKeyForCountry(string $country): string
+    {
+        $country = strtoupper($country);
+        $accountKey = $this->accountKeys[$country] ?? '';
+
+        if ($accountKey !== '') {
+            return $accountKey;
+        }
+
+        return $this->accountKeys['DEFAULT'] ?? '';
+    }
+
+    public function sendSms(string $to, string $message, ?string $accountKey = null, ?string $senderId = null, string $country = 'CA'): array
     {
         $reference = uniqid('msg_', true);
 
-        $response = $this->sendBulk($accountKey ?? $this->defaultAccountKey, [$to], $message, $reference, $senderId);
+        $resolvedKey = $accountKey ?? $this->getAccountKeyForCountry($country);
+        $response = $this->sendBulk($resolvedKey, [$to], $message, $reference, $senderId);
 
         return [
             'success' => $response['http_code'] === 200,

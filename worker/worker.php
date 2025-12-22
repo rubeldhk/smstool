@@ -13,6 +13,15 @@ $rateLimit = (int) (env('SMS_RATE_LIMIT_PER_SEC', '10'));
 $maxAttempts = (int) (env('SMS_MAX_ATTEMPTS', '2'));
 $defaultCountry = 'CA';
 
+function sanitize_phone_for_sending(string $phone, string $country): string
+{
+    if (strtoupper($country) === 'AU') {
+        return ltrim($phone, '+');
+    }
+
+    return $phone;
+}
+
 function calculate_counts_cli(array $recipients, int $invalid): array
 {
     $counts = [
@@ -115,7 +124,8 @@ foreach ($campaigns as $campaign) {
             continue;
         }
 
-        $response = $client->sendBulk($accountKey, [$recipient['phone']], $rendered, $campaignReference, $campaign['sender_id'] ?? null);
+        $sendPhone = sanitize_phone_for_sending($recipient['phone'], $recipient['country'] ?? $country);
+        $response = $client->sendBulk($accountKey, [$sendPhone], $rendered, $campaignReference, $campaign['sender_id'] ?? null);
         $recipient['attempts'] = ($recipient['attempts'] ?? 0) + 1;
         $recipient['http_code'] = $response['http_code'] ?? null;
         $recipient['provider_response'] = $response['response'] ?? null;
